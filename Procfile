@@ -1,1 +1,1 @@
-worker: python diga.py
+worker: python digger.py
