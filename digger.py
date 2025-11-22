@@ -401,8 +401,6 @@ async def cmd_myloot(message: types.Message, user: types.User = None):
     if message.chat.type == "private":
         await message.reply("Я работаю только в чатах!")
         return
-    if MAINTENANCE == 1 and (user.id if user else message.from_user.id) not in ADMIN_IDS:
-        return
     bunker_id = message.chat.id
     bunker_data = await load_data(CHAT_DATA_COLLECTION, bunker_id)
     user_id_str = str(user.id if user else message.from_user.id)
@@ -427,8 +425,6 @@ async def cmd_top(message: types.Message):
     if message.chat.type == "private":
         await message.reply("Я работаю только в чатах!")
         return
-    if MAINTENANCE == 1 and message.from_user.id not in ADMIN_IDS:
-        return
     bunker_id = message.chat.id
     bunker_data = await load_data(CHAT_DATA_COLLECTION, bunker_id)
     sorted_diggers = sorted(bunker_data.values(), key=lambda x: x["gp5"], reverse=True)[:10]
@@ -444,8 +440,6 @@ async def cmd_global_top(message: types.Message):
     global MAINTENANCE
     if message.chat.type == "private":
         await message.reply("Я работаю только в чатах!")
-        return
-    if MAINTENANCE == 1 and message.from_user.id not in ADMIN_IDS:
         return
     all_users = {}
     async for doc in db[CHAT_DATA_COLLECTION].find():
@@ -1022,5 +1016,6 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
