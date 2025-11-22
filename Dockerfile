@@ -1,17 +1,22 @@
 FROM python:3.12-slim
 
-# Открываем порт 8000 — это нужно только для того, чтобы TCP health check прошёл
-EXPOSE 8000
-
-# Добавляем крошечный TCP-сервер на фоне (не мешает боту вообще)
-RUN pip install aiohttp
-
 WORKDIR /app
 
+# Копируем и ставим зависимости
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt aiohttp  # добавляем aiohttp прямо сюда
 
+# Копируем код бота
 COPY . .
 
-# Запускаем бота + крошечный сервер для health check одновременно
-CMD aiohttp web -H 0.0.0.0 -p 8000 aiohttp.web:handle & python digger.py
+# Открываем любой порт (для TCP health check)
+EXPOSE 8000
+
+# Запускаем лёгкий веб-сервер на фоне + сам бот
+CMD python -c "\
+import asyncio, aiohttp.web as web;\
+async def h(r): return web.Response(text='OK');\
+app = web.Application();\
+app.router.add_get('/', h);\
+asyncio.get_event_loop().create_task(web._run_app(app, port=8000));\
+" & python digger.py
