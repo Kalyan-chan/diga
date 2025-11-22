@@ -7,9 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Koyeb требует переменную PORT и открытый порт
 ENV PORT=8080
-EXPOSE 8080
 
-# Запускаем бота (замени digger.py на имя твоего главного файла, если отличается)
 CMD ["python", "digger.py"]
