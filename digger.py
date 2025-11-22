@@ -553,6 +553,9 @@ async def cmd_global_top(message: types.Message):
 
 @dp.callback_query(F.data.in_({"myloot", "top", "gtop"}))
 async def handle_callback(query: types.CallbackQuery):
+    if not query.message:                   
+        await query.answer("Сообщение устарело", show_alert=True)
+        return
     if query.data == "myloot":
         await cmd_myloot(query.message, user=query.from_user)
     elif query.data == "top":
@@ -1021,3 +1024,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
