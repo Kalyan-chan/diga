@@ -47,6 +47,7 @@ db = mongo_client['bot_db']
 IMG_DIR = 'IMG'
 os.makedirs(IMG_DIR, exist_ok=True)
 
+MAINTENANCE = 0
 GLOBAL_DATA_COLLECTION = 'global_loot'
 CHATS_LIST_COLLECTION = 'active_chats'
 PROMO_COLLECTION = 'promocodes'
@@ -1018,4 +1019,5 @@ async def main():
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
+
     asyncio.run(main())
