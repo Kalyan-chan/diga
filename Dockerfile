@@ -7,8 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Это весь трюк — Koyeb будет думать, что это веб-приложение на порту 8080
+# Koyeb требует переменную PORT и открытый порт
 ENV PORT=8080
+EXPOSE 8080
 
-# Запускаем бота нормально
+# Запускаем бота (замени digger.py на имя твоего главного файла, если отличается)
 CMD ["python", "digger.py"]
