@@ -395,6 +395,85 @@ async def cmd_box(message: types.Message):
         reply_markup=keyboard
     )
 
+@dp.message(Command("myloot"))
+async def cmd_myloot(message: types.Message, user: types.User = None):
+    global MAINTENANCE
+    if message.chat.type == "private":
+        await message.reply("Я работаю только в чатах!")
+        return
+    if MAINTENANCE == 1 and (user.id if user else message.from_user.id) not in ADMIN_IDS:
+        return
+    bunker_id = message.chat.id
+    bunker_data = await load_data(CHAT_DATA_COLLECTION, bunker_id)
+    user_id_str = str(user.id if user else message.from_user.id)
+    if user_id_str in bunker_data:
+        digger_data = bunker_data[user_id_str]
+        reply_text = f"Твой улов: {digger_data['gp5']} ГП-5"
+        cooldowns = await load_data(GLOBAL_COOLDOWN_COLLECTION)
+        last_loot = cooldowns.get(user_id_str, {}).get("last_loot", None)
+        if last_loot is not None:
+            reply_text += f"\nПоследняя попытка: {last_loot:+}"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Топ чата", callback_data="top")],
+            [InlineKeyboardButton(text="Глобальный топ", callback_data="gtop")]
+        ])
+        await message.reply(reply_text, reply_markup=keyboard)
+    else:
+        await message.reply("Ты еще ничего не нашел! Используй /dig")
+
+@dp.message(Command("top"))
+async def cmd_top(message: types.Message):
+    global MAINTENANCE
+    if message.chat.type == "private":
+        await message.reply("Я работаю только в чатах!")
+        return
+    if MAINTENANCE == 1 and message.from_user.id not in ADMIN_IDS:
+        return
+    bunker_id = message.chat.id
+    bunker_data = await load_data(CHAT_DATA_COLLECTION, bunker_id)
+    sorted_diggers = sorted(bunker_data.values(), key=lambda x: x["gp5"], reverse=True)[:10]
+    top_list = "\n".join([escape_markdown_v2(f"🏅 {i+1}. {d['username']} - {d['gp5']} ГП-5") for i, d in enumerate(sorted_diggers)])
+    reply_text = f"**{escape_markdown_v2('🏆 Топ чата:')}**\n{top_list if top_list else escape_markdown_v2('Пусто')}"
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Глобальный топ", callback_data="gtop")]
+    ])
+    await message.reply(reply_text, parse_mode="MarkdownV2", reply_markup=keyboard)
+
+@dp.message(Command("gtop"))
+async def cmd_global_top(message: types.Message):
+    global MAINTENANCE
+    if message.chat.type == "private":
+        await message.reply("Я работаю только в чатах!")
+        return
+    if MAINTENANCE == 1 and message.from_user.id not in ADMIN_IDS:
+        return
+    all_users = {}
+    async for doc in db[CHAT_DATA_COLLECTION].find():
+        chat_data = doc['data']
+        for user_id, data in chat_data.items():
+            if user_id not in all_users or data["gp5"] > all_users[user_id]["gp5"]:
+                all_users[user_id] = data
+    sorted_diggers = sorted(all_users.values(), key=lambda x: x["gp5"], reverse=True)[:10]
+    top_list = "\n".join([escape_markdown_v2(f"🌍 {i+1}. {d['username']} - {d['gp5']} ГП-5") for i, d in enumerate(sorted_diggers)])
+    reply_text = f"**{escape_markdown_v2('🔥 Мировой рейтинг диггеров:')}**\n{top_list if top_list else escape_markdown_v2('Пусто')}"
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Топ чата", callback_data="top")]
+    ])
+    await message.reply(reply_text, parse_mode="MarkdownV2", reply_markup=keyboard)
+
+@dp.callback_query(F.data.in_({"myloot", "top", "gtop"}))
+async def handle_callback(query: types.CallbackQuery):
+    if not query.message:                   
+        await query.answer("Сообщение устарело", show_alert=True)
+        return
+    if query.data == "myloot":
+        await cmd_myloot(query.message, user=query.from_user)
+    elif query.data == "top":
+        await cmd_top(query.message)
+    elif query.data == "gtop":
+        await cmd_global_top(query.message)
+    await query.answer()
+
 @dp.callback_query(lambda c: c.data and c.data.startswith("box_open_"))
 async def callback_box_open(query: types.CallbackQuery):
     if not query.message:
@@ -481,87 +560,6 @@ async def callback_box_open(query: types.CallbackQuery):
             reply_markup=None
         )
 
-    await query.answer()
-
-@dp.message(Command("myloot"))
-async def cmd_myloot(message: types.Message, user: types.User = None):
-    global MAINTENANCE
-    if message.chat.type == "private":
-        await message.reply("Я работаю только в чатах!")
-        return
-    if MAINTENANCE == 1 and (user.id if user else message.from_user.id) not in ADMIN_IDS:
-        return
-    bunker_id = message.chat.id
-    bunker_data = await load_data(CHAT_DATA_COLLECTION, bunker_id)
-    user_id_str = str(user.id if user else message.from_user.id)
-    if user_id_str in bunker_data:
-        digger_data = bunker_data[user_id_str]
-        reply_text = f"Твой улов: {digger_data['gp5']} ГП-5"
-        cooldowns = await load_data(GLOBAL_COOLDOWN_COLLECTION)
-        last_loot = cooldowns.get(user_id_str, {}).get("last_loot", None)
-        if last_loot is not None:
-            reply_text += f"\nПоследняя попытка: {last_loot:+}"
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Топ чата", callback_data="top")],
-            [InlineKeyboardButton(text="Глобальный топ", callback_data="gtop")]
-        ])
-        await message.reply(reply_text, reply_markup=keyboard)
-    else:
-        await message.reply("Ты еще ничего не нашел! Используй /dig")
-
-@dp.message(Command("top"))
-async def cmd_top(message: types.Message):
-    global MAINTENANCE
-    if message.chat.type == "private":
-        await message.reply("Я работаю только в чатах!")
-        return
-    if MAINTENANCE == 1 and message.from_user.id not in ADMIN_IDS:
-        return
-    bunker_id = message.chat.id
-    bunker_data = await load_data(CHAT_DATA_COLLECTION, bunker_id)
-    sorted_diggers = sorted(bunker_data.values(), key=lambda x: x["gp5"], reverse=True)[:10]
-    top_list = "\n".join([escape_markdown_v2(f"🏅 {i+1}. {d['username']} - {d['gp5']} ГП-5") for i, d in enumerate(sorted_diggers)])
-    reply_text = f"**{escape_markdown_v2('🏆 Топ чата:')}**\n{top_list if top_list else escape_markdown_v2('Пусто')}"
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Глобальный топ", callback_data="gtop")]
-    ])
-    await message.reply(reply_text, parse_mode="MarkdownV2", reply_markup=keyboard)
-
-@dp.message(Command("gtop"))
-async def cmd_global_top(message: types.Message):
-    global MAINTENANCE
-    if message.chat.type == "private":
-        await message.reply("Я работаю только в чатах!")
-        return
-    if MAINTENANCE == 1 and message.from_user.id not in ADMIN_IDS:
-        return
-    all_users = {}
-    async for doc in db[CHAT_DATA_COLLECTION].find():
-        chat_data = doc['data']
-        for user_id, data in chat_data.items():
-            if user_id not in all_users or data["gp5"] > all_users[user_id]["gp5"]:
-                all_users[user_id] = data
-    sorted_diggers = sorted(all_users.values(), key=lambda x: x["gp5"], reverse=True)[:10]
-    top_list = "\n".join([escape_markdown_v2(f"🌍 {i+1}. {d['username']} - {d['gp5']} ГП-5") for i, d in enumerate(sorted_diggers)])
-    reply_text = f"**{escape_markdown_v2('🔥 Мировой рейтинг диггеров:')}**\n{top_list if top_list else escape_markdown_v2('Пусто')}"
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Топ чата", callback_data="top")]
-    ])
-    await message.reply(reply_text, parse_mode="MarkdownV2", reply_markup=keyboard)
-
-# Callback handlers
-
-@dp.callback_query(F.data.in_({"myloot", "top", "gtop"}))
-async def handle_callback(query: types.CallbackQuery):
-    if not query.message:                   
-        await query.answer("Сообщение устарело", show_alert=True)
-        return
-    if query.data == "myloot":
-        await cmd_myloot(query.message, user=query.from_user)
-    elif query.data == "top":
-        await cmd_top(query.message)
-    elif query.data == "gtop":
-        await cmd_global_top(query.message)
     await query.answer()
 
 # Admin handlers
@@ -1024,4 +1022,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
